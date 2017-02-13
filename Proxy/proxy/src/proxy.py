@@ -23,7 +23,7 @@ error_300 = 'Could not decode (300)\n\n'
 error_200 = 'IO error (200)\n\n'
 error_401 = 'Invalid request syntax (401)\n\n'
 error_800 = 'Socket closed during request (800)\n\n'
-
+error_404 = 'Web page not found (404)\n\n'
 host = ''
 port = 2112
 parser = argparse.ArgumentParser()
@@ -52,7 +52,7 @@ def handle_client(conn, address):
     message = ''
     while True:
         try:
-            data = conn.recv(4096)
+            data = conn.recv(8192)
             try:
                 message = data.decode('utf-8')
             except Exception:
@@ -74,7 +74,6 @@ def handle_client(conn, address):
                    path = o.path
                    if host and path:
                     do_request(host,path)
-
                 elif try_parse(request_list, 0, conn) == 'GET':
                     itsget = 1
                     # need to check request list size
@@ -90,7 +89,6 @@ def handle_client(conn, address):
                             path = request_list[1]
                         else:
                             path = o.path
-
                 elif request_list[0] == 'Host:':
                     host = request_list[1]
                 else:
@@ -118,7 +116,7 @@ def md5():
 
     host = 'hash.cymru.com'
     port = 43
-    
+
     #try connecting to crymu.
     try:
         sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
@@ -146,36 +144,79 @@ def md5():
     data = sock.recv(2048)
 
     print(data)
-    if "NO_DATA" not in data.decode():
+    if b'NO_DATA' not in data:
       print("MALWARE")
       nostring = "Malware has been detected in your request"
       conn.sendall(nostring.encode())
     else:
       conn.sendall(globalstring)
-    
+
     sock.close()
 
-
 #when given a host and path connect, and send.
+# def do_request_browser(host, path):
+#     # print('doing queue on host ' + host + ' path: ' + path)
+#     req_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     port = 80
+#     request = "GET " + path + " HTTP/1.0\nHost: " + host + "\n\nConnection: close\n\n"
+#     try:
+#         req_sock.connect((host, port))
+#         req_sock.send(request.encode())
+#     except Exception:
+#         conn.sendall(error_404.encode())
+#
+#
+#     buffer = req_sock.recv(4096)
+#     conn.sendall(buffer)
+#     # globalstring.extend(buffer)
+#     #get bytes while you still can.
+#
+#     while(len(buffer) > 0):
+#         try:
+#             # req_sock.timeout(1)
+#             buffer = req_sock.recv(4096)
+#             conn.sendall(buffer)
+#         except Exception:
+#             break
+#
+#
+#     # print("calling md5")
+#     # md5()
+#     # conn.sendall(globalstring)
+#     req_sock.close()
+
+#when given a host and path connect, and send..this is for telnet only.
 def do_request(host, path):
     # print('doing queue on host ' + host + ' path: ' + path)
     req_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     port = 80
     request = "GET " + path + " HTTP/1.0\nHost: " + host + "\n\nConnection: close\n\n"
-    req_sock.connect((host, port))
-    req_sock.send(request.encode())
+    try:
+        req_sock.connect((host, port))
+        req_sock.send(request.encode())
+    except Exception:
+        print('404')
+        conn.sendall(error_404.encode())
+
 
     buffer = req_sock.recv(4096)
     globalstring.extend(buffer)
     #get bytes while you still can.
     while(len(buffer) > 0):
-        buffer = req_sock.recv(4096)
-        globalstring.extend(buffer)
+        try:
+            req_sock.settimeout(1)
+            buffer = req_sock.recv(4096)
+            globalstring.extend(buffer)
+        except Exception:
+            break
 
-    req_sock.close()
+    if(len(globalstring) == 0):
+        print('404?')
+
     # print("calling md5")
     md5()
-
+    # conn.sendall(globalstring)
+    req_sock.close()
 
 if __name__ == "__main__":
     try:
